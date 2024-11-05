@@ -1,0 +1,14 @@
+{
+    "name": "supermercados-cunha",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "start": "npm start --prefix backend & npm start --prefix frontend",
+        "build": "npm run build --prefix backend && npm run build --prefix frontend",
+        "deploy": "vercel --prod",
+        "dev": "npm run dev --prefix backend & npm run start --prefix frontend"
+    },
+    "dependencies": {
+        "concurrently": "^7.0.0"
+    }
+}
