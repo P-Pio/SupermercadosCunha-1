@@ -20,6 +20,9 @@ function Sidebar() {
         <Link as={RouterLink} to="/visualizacao-geral">
           Visualização Geral
         </Link>
+        <Link as={RouterLink} to="/visualizacao-automatica">
+          Visualização Automática
+        </Link>
       </Stack>
     </Box>
   );

@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Cadastros from "./pages/Cadastros"; // Ensure this path is correct
 import VisualizacaoGeral from "./pages/VisualizacaoGeral"; // Adjust path as necessary
+import VisualizacaoAutomatica from "./pages/VisualizacaoAutomatica";
 import HomePage from "./pages/Homepage";
 import "./App.css"; // Ensure the CSS file is correctly imported
 import theme from "./Theme/CustomTheme";
@@ -24,6 +25,10 @@ function App() {
               <Route
                 path="/visualizacao-geral"
                 element={<VisualizacaoGeral />}
+              />
+              <Route
+                path="/visualizacao-automatica"
+                element={<VisualizacaoAutomatica />}
               />
             </Routes>
           </div>
