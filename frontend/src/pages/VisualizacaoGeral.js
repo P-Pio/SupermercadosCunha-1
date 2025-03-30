@@ -46,25 +46,25 @@ function VisualizacaoGeral() {
   useEffect(() => {
     const fetchResources = async () => {
       const fetchPrices = async () => {
-        const response = await fetch('https://supermercados-cunha.vercel.app/api/prices');
+        const response = await fetch(`${apiUrl}/api/prices`);
         const data = await response.json();
         setPrices(data);
       };
 
       const fetchSupermarkets = async () => {
-        const response = await fetch('https://supermercados-cunha.vercel.app/api/supermarkets');
+        const response = await fetch(`${apiUrl}/api/supermarkets`);
         const data = await response.json();
         setSupermarkets(data);
       };
 
       const fetchBrands = async () => {
-        const response = await fetch('https://supermercados-cunha.vercel.app/api/brands');
+        const response = await fetch(`${apiUrl}/api/brands`);
         const data = await response.json();
         setBrands(data);
       };
 
       const fetchItems = async () => {
-        const response = await fetch('https://supermercados-cunha.vercel.app/api/items');
+        const response = await fetch(`${apiUrl}/api/items`);
         const data = await response.json();
         setItems(data);
       };
@@ -133,7 +133,7 @@ function VisualizacaoGeral() {
 
 
     const encodedPeriod = encodeURIComponent(period);
-    const url = `https://supermercados-cunha.vercel.app/api/prices/historical/${itemId}?period=${encodedPeriod}`;
+    const url = `${apiUrl}/api/prices/historical/${itemId}?period=${encodedPeriod}`;
     try {
       const response = await fetch(url);
       if (!response.ok) {

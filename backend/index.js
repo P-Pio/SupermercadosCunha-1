@@ -9,6 +9,7 @@ const supermarketRoutes = require("./routes/supermarketRoutes");
 const priceRoutes = require("./routes/priceRoutes");
 const overviewRoutes = require("./routes/overviewRoutes");
 const brandRoutes = require("./routes/brandRoutes");
+const automationRoutes = require("./routes/automation")
 
 const app = express();
 
@@ -31,6 +32,8 @@ app.use("/api/supermarkets", supermarketRoutes);
 app.use("/api/prices", priceRoutes);
 app.use("/api/overview", overviewRoutes);
 app.use("/api/brands", brandRoutes);
+app.use("/api/automation", automationRoutes);
+
 
 // Define a catch-all route for any unhandled requests
 app.use("*", (req, res) => {
