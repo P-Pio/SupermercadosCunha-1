@@ -149,7 +149,13 @@ function VisualizacaoGeral() {
             <Tbody>
               {externalResults.map((item, index) => (
                 <Tr key={index}>
-                  <Td>{item.supermercado}</Td>
+                  <Td>
+                    {{
+                      atacadao: "Atacadão",
+                      spani: "Spani",
+                      tenda: "Tenda",
+                    }[item.supermercado] || item.supermercado}
+                  </Td>
                   <Td>{item.produto}</Td>
                   <Td>{item.preco}</Td>
                   <Td>{item.quantidade}</Td>
