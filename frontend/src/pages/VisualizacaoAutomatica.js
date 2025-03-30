@@ -139,7 +139,7 @@ function VisualizacaoGeral() {
               <Tr>
                 <Th>Supermercado</Th>
                 <Th>Produto</Th>
-                <Th>Preço</Th>
+                <Th>Preço(R$)</Th>
                 <Th>Quantidade</Th>
                 <Th>Unidade</Th>
                 <Th>Data</Th>
@@ -157,7 +157,11 @@ function VisualizacaoGeral() {
                     }[item.supermercado] || item.supermercado}
                   </Td>
                   <Td>{item.produto}</Td>
-                  <Td>{item.preco}</Td>
+                  <Td>
+                    {typeof item.preco === "number"
+                      ? item.preco.toFixed(2).replace(".", ",")
+                      : "-"}
+                  </Td>
                   <Td>{item.quantidade}</Td>
                   <Td>{item.unidade}</Td>
                   <Td>{item.data}</Td>
