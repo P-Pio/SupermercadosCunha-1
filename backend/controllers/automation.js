@@ -49,12 +49,23 @@ async function fetchAtacadaoProducts(query) {
       return [];
     }
 
-    const products = data.map((p) => ({
-      name: p.productName,
-      price: p.items[0]?.sellers[0]?.commertialOffer?.Price,
-      image: p.items[0]?.images[0]?.imageUrl,
-      link: `https://www.atacadao.com.br${p.link}`,
-    }));
+    const products = data.map((p) => {
+      let finalLink = p.link;
+
+      // 🛠️ Force replace the secure domain if present
+      if (finalLink.startsWith("https://secure.atacadao.com.br")) {
+        finalLink = finalLink.replace("https://secure.atacadao.com.br", "https://www.atacadao.com.br");
+      } else if (!finalLink.startsWith("http")) {
+        finalLink = `https://www.atacadao.com.br${finalLink}`;
+      }
+
+      return {
+        name: p.productName,
+        price: p.items[0]?.sellers[0]?.commertialOffer?.Price,
+        image: p.items[0]?.images[0]?.imageUrl,
+        link: finalLink,
+      };
+    });
 
     console.log(`[Atacadão] Found ${products.length} products`);
     return products;
@@ -63,6 +74,7 @@ async function fetchAtacadaoProducts(query) {
     return [];
   }
 }
+
 
 // 🔍 Tenda
 async function fetchTendaProducts(query) {
