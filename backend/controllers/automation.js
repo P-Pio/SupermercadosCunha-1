@@ -1,5 +1,6 @@
 const cheerio = require('cheerio');
 const fetch = global.fetch || require('node-fetch'); // Use built-in or polyfill
+const SearchResult = require('../models/SearchResults.js')
 
 // 🔍 Spani
 async function fetchSpaniProducts(query) {
