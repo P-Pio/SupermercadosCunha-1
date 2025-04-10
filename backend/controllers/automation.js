@@ -15,13 +15,11 @@ async function fetchSpaniProducts(query) {
     $('.prateleira .produto').each((_, el) => {
       const name = $(el).find('.nome-produto').text().trim();
       const price = $(el).find('.preco-avista .preco-por').text().trim();
-      const image = $(el).find('img').attr('src');
       const link = $(el).find('a').attr('href');
       if (name && price) {
         products.push({
           name,
           price,
-          image,
           link: `https://www.spaniatacadista.com.br${link}`,
         });
       }
@@ -62,7 +60,6 @@ async function fetchAtacadaoProducts(query) {
       return {
         name: p.productName,
         price: p.items[0]?.sellers[0]?.commertialOffer?.Price,
-        image: p.items[0]?.images[0]?.imageUrl,
         link: finalLink,
       };
     });
@@ -93,7 +90,6 @@ async function fetchTendaProducts(query) {
     const products = data.map((p) => ({
       name: p.productName,
       price: p.items[0]?.sellers[0]?.commertialOffer?.Price,
-      image: p.items[0]?.images[0]?.imageUrl,
       link: `https://www.tendaatacado.com.br${p.link}`,
     }));
 
@@ -116,23 +112,54 @@ exports.searchExternalItems = async (req, res) => {
   console.log(`[API] Incoming search for: ${term}`);
 
   try {
+    // ⏰ Date boundaries for "today"
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // 🔍 Check if result for this query already exists today
+    const existing = await SearchResult.findOne({
+      query: term,
+      createdAt: { $gte: startOfToday, $lte: endOfToday },
+    });
+
     const [spani, atacadao, tenda] = await Promise.all([
       fetchSpaniProducts(term),
       fetchAtacadaoProducts(term),
       fetchTendaProducts(term),
     ]);
 
-    console.log(`[API] Returning results for: ${term}`);
-    res.json({
+    if (existing) {
+      console.log(`[API] Existing result found for '${term}' today – skipping save`);
+      return res.json({
+        query: term,
+        results: { spani, atacadao, tenda },
+      });
+    }
+
+    // Clean data before saving (no link)
+    const cleanSpani = spani.map(({ name, price }) => ({ name, price }));
+    const cleanAtacadao = atacadao.map(({ name, price }) => ({ name, price }));
+    const cleanTenda = tenda.map(({ name, price }) => ({ name, price }));
+
+    const saved = await SearchResult.create({
       query: term,
-      results: {
-        spani,
-        atacadao,
-        tenda,
-      },
+      spani: cleanSpani,
+      atacadao: cleanAtacadao,
+      tenda: cleanTenda,
     });
+
+    console.log(`[API] Saved new result for '${term}'`);
+
+    return res.json({
+      query: term,
+      results: { spani, atacadao, tenda },
+    });
+
   } catch (err) {
-    console.error(`[API] Failed to fetch product data:`, err.message);
-    res.status(500).json({ error: 'Failed to fetch product data' });
+    console.error(`[API] Failed to fetch/save product data:`, err.message);
+    return res.status(500).json({ error: 'Failed to fetch or save product data' });
   }
 };
