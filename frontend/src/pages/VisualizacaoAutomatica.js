@@ -63,8 +63,8 @@ function VisualizacaoGeral() {
                 supermercado: source,
                 produto: item.name || "-",
                 preco: item.price || "-",
-                quantidade: "-",
-                unidade: "-",
+                quantidade: item.quantity,
+                unidade: item.unit,
                 data: new Date().toLocaleDateString("pt-BR"),
                 link: item.link || "#",
               });

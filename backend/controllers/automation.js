@@ -2,10 +2,38 @@ const cheerio = require('cheerio');
 const fetch = global.fetch || require('node-fetch'); // Use built-in or polyfill
 const SearchResult = require('../models/SearchResults.js')
 
+// 📌 List of tracked essential items (canonical names)
+const essentialItems = [
+  "Arroz 5kg",
+  "Açúcar 5kg",
+  "Feijão 1kg",
+  "Óleo de Soja 900ml",
+  "Farinha de milho 1kg",
+  "Farinha de mandioca 500g",
+  "Pó de Café 500g",
+  "Macarrão 500g",
+  "Farinha de trigo 1kg",
+  "Leite UHT 1L",
+  "Margarina 500g",
+  "Banana 1kg",
+  "Batata Inglesa 1kg",
+  "Carne bovina contra filé 1kg",
+  "Frango inteiro congelado 1kg"
+];
+
+// ✅ Ensure this helper is defined before using it
+function matchEssentialItem(term) {
+  return essentialItems.find(item =>
+    item.toLowerCase() === term.trim().toLowerCase()
+  ) || null;
+}
+
 // 🔍 Spani
 async function fetchSpaniProducts(query) {
   console.log(`[Spani] Searching for: ${query}`);
-  const url = `https://www.spaniatacadista.com.br/buscapagina?ft=${query}`;
+  const encodedQuery = query.trim().replace(/\s+/g, '+');
+
+  const url = `https://www.spanionline.com.br/busca?termo=${query}&departamento=0&page=1`;
 
   try {
     const res = await fetch(url);
@@ -13,15 +41,19 @@ async function fetchSpaniProducts(query) {
     const $ = cheerio.load(html);
     const products = [];
 
-    $('.prateleira .produto').each((_, el) => {
-      const name = $(el).find('.nome-produto').text().trim();
-      const price = $(el).find('.preco-avista .preco-por').text().trim();
-      const link = $(el).find('a').attr('href');
+    $('vip-card-produto').each((_, el) => {
+      const name = $(el).find('[data-cy="produto-descricao"]').text().trim();
+      const price = $(el).find('[data-cy="preco"]').text().trim();
+      const relativeLink = $(el).find('a').attr('href');
+      const link = relativeLink?.startsWith('http')
+        ? relativeLink
+        : `https://www.spanionline.com.br${relativeLink}`;
+
       if (name && price) {
         products.push({
           name,
           price,
-          link: `https://www.spaniatacadista.com.br${link}`,
+          link,
         });
       }
     });
@@ -34,7 +66,6 @@ async function fetchSpaniProducts(query) {
   }
 }
 
-// 🔍 Atacadão
 async function fetchAtacadaoProducts(query) {
   console.log(`[Atacadão] Searching for: ${query}`);
   const url = `https://www.atacadao.com.br/api/catalog_system/pub/products/search/${query}`;
@@ -49,9 +80,14 @@ async function fetchAtacadaoProducts(query) {
     }
 
     const products = data.map((p) => {
-      let finalLink = p.link;
+      const item = p.items[0];
+      const seller = item?.sellers?.[0];
+      const offer = seller?.commertialOffer;
 
-      // 🛠️ Force replace the secure domain if present
+      const quantity = item?.unitMultiplier || null;
+      const unit = item?.measurementUnit || null;
+
+      let finalLink = p.link || '';
       if (finalLink.startsWith("https://secure.atacadao.com.br")) {
         finalLink = finalLink.replace("https://secure.atacadao.com.br", "https://www.atacadao.com.br");
       } else if (!finalLink.startsWith("http")) {
@@ -60,8 +96,10 @@ async function fetchAtacadaoProducts(query) {
 
       return {
         name: p.productName,
-        price: p.items[0]?.sellers[0]?.commertialOffer?.Price,
+        price: offer?.Price,
         link: finalLink,
+        quantity,
+        unit,
       };
     });
 
@@ -74,10 +112,13 @@ async function fetchAtacadaoProducts(query) {
 }
 
 
+
 // 🔍 Tenda
 async function fetchTendaProducts(query) {
   console.log(`[Tenda] Searching for: ${query}`);
-  const url = `https://www.tendaatacado.com.br/api/catalog_system/pub/products/search/${query}`;
+  // Encode the query by replacing spaces with '+'
+  const encodedQuery = query.trim().replace(/\s+/g, '+');
+  const url = `https://www.tendaatacado.com.br/busca?q=${encodedQuery}`;
 
   try {
     const res = await fetch(url);
@@ -113,18 +154,19 @@ exports.searchExternalItems = async (req, res) => {
   console.log(`[API] Incoming search for: ${term}`);
 
   try {
-    // ⏰ Date boundaries for "today"
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const matchedItem = matchEssentialItem(term);
+    const now = new Date();
 
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const startOfToday = new Date(now.setHours(0, 0, 0, 0));
+    const endOfToday = new Date(now.setHours(23, 59, 59, 999));
 
-    // 🔍 Check if result for this query already exists today
-    const existing = await SearchResult.findOne({
-      query: term,
+    // 🔍 Check for existing entry — based on item if matched, otherwise query
+    const existingQuery = {
       createdAt: { $gte: startOfToday, $lte: endOfToday },
-    });
+      ...(matchedItem ? { item: matchedItem } : { query: term }),
+    };
+
+    const existing = await SearchResult.findOne(existingQuery);
 
     const [spani, atacadao, tenda] = await Promise.all([
       fetchSpaniProducts(term),
@@ -133,30 +175,38 @@ exports.searchExternalItems = async (req, res) => {
     ]);
 
     if (existing) {
-      console.log(`[API] Existing result found for '${term}' today – skipping save`);
+      console.log(`[API] Skipping save – already exists for '${matchedItem || term}' today`);
       return res.json({
         query: term,
+        item: matchedItem,
         results: { spani, atacadao, tenda },
+        saved: false,
+        existingId: existing._id,
       });
     }
 
-    // Clean data before saving (no link)
-    const cleanSpani = spani.map(({ name, price }) => ({ name, price }));
-    const cleanAtacadao = atacadao.map(({ name, price }) => ({ name, price }));
-    const cleanTenda = tenda.map(({ name, price }) => ({ name, price }));
+    // Prepare clean data
+    const cleanSpani = spani.map(({ name, price, quantity, unity }) => ({ name, price, quantity, unity }));
+    const cleanAtacadao = atacadao.map(({ name, price, quantity, unity }) => ({ name, price, quantity, unity }));
+    const cleanTenda = tenda.map(({ name, price, quantity, unity }) => ({ name, price, quantity, unity }));
 
+    // Save
     const saved = await SearchResult.create({
       query: term,
+      item: matchedItem,
       spani: cleanSpani,
       atacadao: cleanAtacadao,
       tenda: cleanTenda,
     });
 
-    console.log(`[API] Saved new result for '${term}'`);
+    console.log(`[API] Saved result for '${matchedItem || term}'`);
 
-    return res.json({
+    res.json({
       query: term,
+      item: matchedItem,
       results: { spani, atacadao, tenda },
+      saved: true,
+      savedId: saved._id,
     });
 
   } catch (err) {
