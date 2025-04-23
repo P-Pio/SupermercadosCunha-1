@@ -6,12 +6,9 @@ const cheerio = require('cheerio');
  * @param {string} query - Search term
  * @returns {Promise<Array>} - Promise resolving to array of product objects
  */
-async function fetchTendaProducts(query) {
-  console.log(`[Tenda] Searching for: ${query}`);
-  
+async function fetchTendaProducts(query) {  
   // Store the original query words for filtering later
   const queryWords = query.toLowerCase().trim().split(/\s+/).filter(word => word.length > 2);
-  console.log(`[Tenda] Query words for filtering: ${queryWords.join(', ')}`);
   
   // Encode the query by replacing spaces with '+'
   const encodedQuery = query.trim().replace(/\s+/g, '+');
@@ -22,7 +19,6 @@ async function fetchTendaProducts(query) {
     let allProducts = [];
 
     // First try to fetch using API if it exists
-    console.log(`[Tenda] Trying API approach first`);
     const apiUrl = `https://www.tendaatacado.com.br/api/catalog_system/pub/products/search?ft=${encodedQuery}`;
     
     try {
@@ -39,14 +35,6 @@ async function fetchTendaProducts(query) {
         const data = await apiRes.json();
         
         if (Array.isArray(data) && data.length > 0) {
-          console.log(`[Tenda] API returned ${data.length} products`);
-          
-          // Debug: Print the structure of the first API product
-          if (data.length > 0) {
-            console.log(`[Tenda] DEBUG - API product structure sample:`);
-            console.log(JSON.stringify(data[0], null, 2).substring(0, 500) + '...');
-          }
-          
           const apiProducts = data.map(p => {
             // Extract price from commertialOffer or commercialOffer (handle both spellings)
             let price = null;
@@ -86,8 +74,6 @@ async function fetchTendaProducts(query) {
               source: 'tenda_api'
             };
           }).filter(p => p.name && p.price); // Remove items without name or price
-          
-          console.log(`[Tenda] Processed ${apiProducts.length} valid products from API`);
           allProducts = apiProducts;
         }
       }
@@ -95,9 +81,6 @@ async function fetchTendaProducts(query) {
       console.error(`[Tenda] API approach failed:`, apiError.message);
       // Continue with HTML scraping
     }
-    
-    // Fall back to HTML scraping
-    console.log(`[Tenda] Falling back to HTML scraping: ${url}`);
     
     const res = await fetch(url, {
       headers: {
@@ -116,18 +99,9 @@ async function fetchTendaProducts(query) {
     
     // Create an array to store products from HTML scraping
     const scrapedProducts = [];
-    
-    // Log some details about the page structure to help with debugging
-    console.log(`[Tenda] Page title: ${$('title').text()}`);
-    console.log(`[Tenda] Page has ${$('div').length} divs, ${$('a').length} links, ${$('img').length} images`);
-    console.log(`[Tenda] Price indicators: ${$('*:contains("R$")').length} elements contain 'R$'`);
-    
+   
     // Log a small sample of the HTML to help with debugging
     const htmlSample = html.substring(0, 300) + '...';
-    console.log(`[Tenda] HTML sample: ${htmlSample}`);
-
-    // DIRECT APPROACH: Find all elements with price text and extract product information
-    console.log('[Tenda] Using direct approach to find products with price information');
     
     // Find all elements containing price text (R$)
     const priceElements = $('*').filter(function() {
@@ -136,8 +110,6 @@ async function fetchTendaProducts(query) {
              text.length > 10 && 
              text.length < 500;
     });
-    
-    console.log(`[Tenda] Found ${priceElements.length} elements with price information`);
     
     // Process each element with price information
     priceElements.each(function() {
@@ -253,20 +225,12 @@ async function fetchTendaProducts(query) {
         });
       }
     });
-
-    // Debug: Print sample of scraped product if available
-    if (scrapedProducts.length > 0) {
-      console.log(`[Tenda] DEBUG - HTML scraped product sample:`);
-      console.log(JSON.stringify(scrapedProducts[0], null, 2));
-    }
     
     // If no products found yet, try to search for structured data
     if (scrapedProducts.length === 0) {
       // Look for JSON-LD data in script tags
       const jsonScripts = $('script[type="application/ld+json"]');
-      if (jsonScripts.length > 0) {
-        console.log(`[Tenda] Found ${jsonScripts.length} JSON-LD scripts in the HTML`);
-        
+      if (jsonScripts.length > 0) {      
         jsonScripts.each((_, script) => {
           try {
             const jsonData = JSON.parse($(script).html());
@@ -331,9 +295,7 @@ async function fetchTendaProducts(query) {
                $(this).text().includes('price') || 
                $(this).text().includes('R$');
       });
-      
-      console.log(`[Tenda] Found ${scriptTags.length} scripts with potential product data`);
-      
+
       // Try to extract structured data
       scriptTags.each((_, script) => {
         const scriptText = $(script).text();
@@ -403,11 +365,7 @@ async function fetchTendaProducts(query) {
           }
         }
       });
-    }
-
-    // Merge scraped products with API products (if any)
-    console.log(`[Tenda] Found ${scrapedProducts.length} products through HTML scraping`);
-    
+    }    
     // Add scraped products to allProducts array
     allProducts = [...allProducts, ...scrapedProducts];
     
@@ -417,7 +375,6 @@ async function fetchTendaProducts(query) {
       allProducts.forEach(product => {
         Object.keys(product).forEach(key => allColumns.add(key));
       });
-      console.log(`[Tenda] DEBUG - All available data columns: ${Array.from(allColumns).join(', ')}`);
       
       // Log data types for each column
       const columnTypes = {};
@@ -430,11 +387,6 @@ async function fetchTendaProducts(query) {
           columnTypes[key].add(type);
         });
       });
-      
-      console.log('[Tenda] DEBUG - Column data types:');
-      Object.entries(columnTypes).forEach(([column, types]) => {
-        console.log(`  - ${column}: ${Array.from(types).join(', ')}`);
-      });
     }
     
     // Filter out duplicates using a more robust approach
@@ -443,25 +395,9 @@ async function fetchTendaProducts(query) {
     // Apply query word filtering to ensure all products match ALL query words
     const filteredProducts = filterProductsByQueryWords(uniqueProducts, queryWords);
     
-    console.log(`[Tenda] After filtering duplicates: ${uniqueProducts.length} products`);
-    console.log(`[Tenda] After filtering by query words: ${filteredProducts.length} products`);
-    
-    // Debug: Log a sample of the final product data after filtering
-    if (filteredProducts.length > 0) {
-      console.log(`[Tenda] DEBUG - Sample filtered product:`);
-      console.log(JSON.stringify(filteredProducts[0], null, 2));
-    }
-    
     // Format products according to the Mongoose schema
     const formattedProducts = formatProductsForMongoose(filteredProducts);
     
-    // Debug: Log a sample of the formatted product
-    if (formattedProducts.length > 0) {
-      console.log(`[Tenda] DEBUG - Sample formatted product for MongoDB:`);
-      console.log(JSON.stringify(formattedProducts[0], null, 2));
-    }
-    
-    console.log(`[Tenda] Returning ${formattedProducts.length} formatted products`);
     return formattedProducts;
   } catch (err) {
     console.error(`[Tenda] Error fetching products:`, err.message);
