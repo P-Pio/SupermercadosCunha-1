@@ -47,13 +47,13 @@ function Cadastros() {
   }, []);
 
   const fetchItems = async () => {
-    const response = await fetch('https://supermercados-cunha.vercel.app/api/items');
+    const response = await fetch(`${apiUrl}/api/items`);
     const data = await response.json();
     setItems(data);
   };
 
   const fetchSupermarkets = async () => {
-    const response = await fetch('https://supermercados-cunha.vercel.app/api/supermarkets');
+    const response = await fetch(`${apiUrl}/api/supermarkets`);
     const data = await response.json();
     setSupermarkets(data);
   };
@@ -61,7 +61,7 @@ function Cadastros() {
   const handleSupermercadoSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('https://supermercados-cunha.vercel.app/api/supermarkets', {
+      const response = await fetch(`${apiUrl}/api/supermarkets`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -100,7 +100,7 @@ function Cadastros() {
   const handleItemSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('https://supermercados-cunha.vercel.app/api/items', {
+      const response = await fetch(`${apiUrl}/api/items`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -132,7 +132,7 @@ function Cadastros() {
 
   const fetchBrands = async () => {
     try {
-      const response = await fetch('https://supermercados-cunha.vercel.app/api/brands');
+      const response = await fetch(`${apiUrl}/api/brands`);
       const brands = await response.json();
       const options = brands.map((brand) => ({
         value: brand._id, // Assuming each brand has an _id and a name
@@ -153,7 +153,7 @@ function Cadastros() {
   const handleBrandSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('https://supermercados-cunha.vercel.app/api/brands', {
+      const response = await fetch(`${apiUrl}/api/brands`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -186,7 +186,7 @@ function Cadastros() {
   const handleValorItemSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('https://supermercados-cunha.vercel.app/api/prices', {
+      const response = await fetch(`${apiUrl}/api/prices`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
