@@ -6,14 +6,11 @@ const fetch = global.fetch || require('node-fetch'); // Use built-in or polyfill
  * @returns {Promise<Array>} - Promise resolving to array of product objects
  */
 async function fetchAtacadaoProducts(query) {
-  console.log(`[Atacadão] Searching for: ${query}`);
   const encodedQuery = encodeURIComponent(query.trim());
   const url = `https://www.atacadao.com.br/api/catalog_system/pub/products/search/${encodedQuery}`;
 
   try {
-    console.log(`[Atacadão] Fetching from API URL: ${url}`);
-    
-    const res = await fetch(url, {
+      const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -32,7 +29,6 @@ async function fetchAtacadaoProducts(query) {
       return [];
     }
 
-    console.log(`[Atacadão] Successfully retrieved ${data.length} products from API`);
 
     const products = data.map((p) => {
       const item = p.items?.[0];
@@ -60,14 +56,12 @@ async function fetchAtacadaoProducts(query) {
       };
     }).filter(p => p.name && p.price); // Filter out products without name or price
 
-    console.log(`[Atacadão] Processed ${products.length} valid products`);
     return products;
   } catch (err) {
     console.error(`[Atacadão] Error fetching products:`, err.message);
     
     // Try an alternative approach if the API fails
     try {
-      console.log(`[Atacadão] Trying alternative search approach...`);
       const altUrl = `https://www.atacadao.com.br/busca/?q=${encodeURIComponent(query.trim())}`;
       
       const res = await fetch(altUrl, {
@@ -88,7 +82,6 @@ async function fetchAtacadaoProducts(query) {
       // Look for product data in JSON-LD format
       const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi);
       if (jsonLdMatch) {
-        console.log(`[Atacadão] Found ${jsonLdMatch.length} JSON-LD blocks in the HTML`);
         
         const products = [];
         
@@ -165,12 +158,10 @@ async function fetchAtacadaoProducts(query) {
         }
         
         if (products.length > 0) {
-          console.log(`[Atacadão] Found ${products.length} products from JSON-LD data`);
           return products;
         }
       }
       
-      console.log(`[Atacadão] Could not extract products from HTML alternative approach`);
       return []; // Return empty array if both approaches fail
     } catch (altErr) {
       console.error(`[Atacadão] Alternative approach failed:`, altErr.message);
