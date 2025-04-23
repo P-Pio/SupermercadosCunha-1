@@ -1,6 +1,5 @@
-const cheerio = require('cheerio');
-const fetch = global.fetch || require('node-fetch'); // Use built-in or polyfill
-const SearchResult = require('../models/SearchResults.js')
+const SearchResult = require('../models/SearchResults.js');
+const siteScrapers = require('../sites');
 
 // 📌 List of tracked essential items (canonical names)
 const essentialItems = [
@@ -28,119 +27,18 @@ function matchEssentialItem(term) {
   ) || null;
 }
 
-// 🔍 Spani
-async function fetchSpaniProducts(query) {
-  console.log(`[Spani] Searching for: ${query}`);
-  const encodedQuery = query.trim().replace(/\s+/g, '+');
-
-  const url = `https://www.spanionline.com.br/busca?termo=${query}&departamento=0&page=1`;
-
-  try {
-    const res = await fetch(url);
-    const html = await res.text();
-    const $ = cheerio.load(html);
-    const products = [];
-
-    $('vip-card-produto').each((_, el) => {
-      const name = $(el).find('[data-cy="produto-descricao"]').text().trim();
-      const price = $(el).find('[data-cy="preco"]').text().trim();
-      const relativeLink = $(el).find('a').attr('href');
-      const link = relativeLink?.startsWith('http')
-        ? relativeLink
-        : `https://www.spanionline.com.br${relativeLink}`;
-
-      if (name && price) {
-        products.push({
-          name,
-          price,
-          link,
-        });
-      }
-    });
-
-    console.log(`[Spani] Found ${products.length} products`);
-    return products;
-  } catch (err) {
-    console.error(`[Spani] Error fetching products:`, err.message);
-    return [];
-  }
-}
-
-async function fetchAtacadaoProducts(query) {
-  console.log(`[Atacadão] Searching for: ${query}`);
-  const url = `https://www.atacadao.com.br/api/catalog_system/pub/products/search/${query}`;
-
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!Array.isArray(data)) {
-      console.warn(`[Atacadão] Unexpected response format`);
-      return [];
-    }
-
-    const products = data.map((p) => {
-      const item = p.items[0];
-      const seller = item?.sellers?.[0];
-      const offer = seller?.commertialOffer;
-
-      const quantity = item?.unitMultiplier || null;
-      const unit = item?.measurementUnit || null;
-
-      let finalLink = p.link || '';
-      if (finalLink.startsWith("https://secure.atacadao.com.br")) {
-        finalLink = finalLink.replace("https://secure.atacadao.com.br", "https://www.atacadao.com.br");
-      } else if (!finalLink.startsWith("http")) {
-        finalLink = `https://www.atacadao.com.br${finalLink}`;
-      }
-
-      return {
-        name: p.productName,
-        price: offer?.Price,
-        link: finalLink,
-        quantity,
-        unit,
-      };
-    });
-
-    console.log(`[Atacadão] Found ${products.length} products`);
-    return products;
-  } catch (err) {
-    console.error(`[Atacadão] Error fetching products:`, err.message);
-    return [];
-  }
-}
-
-
-
-// 🔍 Tenda
-async function fetchTendaProducts(query) {
-  console.log(`[Tenda] Searching for: ${query}`);
-  // Encode the query by replacing spaces with '+'
-  const encodedQuery = query.trim().replace(/\s+/g, '+');
-  const url = `https://www.tendaatacado.com.br/busca?q=${encodedQuery}`;
-
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!Array.isArray(data)) {
-      console.warn(`[Tenda] Unexpected response format`);
-      return [];
-    }
-
-    const products = data.map((p) => ({
-      name: p.productName,
-      price: p.items[0]?.sellers[0]?.commertialOffer?.Price,
-      link: `https://www.tendaatacado.com.br${p.link}`,
-    }));
-
-    console.log(`[Tenda] Found ${products.length} products`);
-    return products;
-  } catch (err) {
-    console.error(`[Tenda] Error fetching products:`, err.message);
-    return [];
-  }
+/**
+ * Clean product data for database storage
+ * @param {Array} products - Array of product objects
+ * @returns {Array} - Array of cleaned product objects
+ */
+function cleanProductData(products) {
+  return products.map(({ name, price, quantity, unit }) => ({ 
+    name, 
+    price, 
+    quantity: quantity || null, 
+    unit: unit || '' // Ensure unit is always a string
+  }));
 }
 
 // 🔁 API Endpoint
@@ -168,49 +66,88 @@ exports.searchExternalItems = async (req, res) => {
 
     const existing = await SearchResult.findOne(existingQuery);
 
-    const [spani, atacadao, tenda] = await Promise.all([
-      fetchSpaniProducts(term),
-      fetchAtacadaoProducts(term),
-      fetchTendaProducts(term),
-    ]);
+    // Get all available scrapers
+    const { fetchSpaniProducts, fetchAtacadaoProducts, fetchTendaProducts } = siteScrapers;
+    
+    // Build an array of scraping tasks
+    const scrapingTasks = [
+      { name: 'spani', scraper: fetchSpaniProducts },
+      { name: 'atacadao', scraper: fetchAtacadaoProducts },
+      { name: 'tenda', scraper: fetchTendaProducts }
+    ];
 
+    // Execute all scraping tasks in parallel
+    console.log(`[API] Starting parallel scraping for '${term}'`);
+    const startTime = Date.now();
+    
+    const scrapingResults = await Promise.all(
+      scrapingTasks.map(async ({ name, scraper }) => {
+        try {
+          const products = await scraper(term);
+          console.log(`[API] ${name.charAt(0).toUpperCase() + name.slice(1)}: Found ${products.length} products`);
+          return { name, products, error: null };
+        } catch (err) {
+          console.error(`[API] Error scraping ${name}:`, err.message);
+          return { name, products: [], error: err.message };
+        }
+      })
+    );
+    
+    // Convert results to an object
+    const results = scrapingResults.reduce((acc, { name, products }) => {
+      acc[name] = products;
+      return acc;
+    }, {});
+    
+    // Log performance summary
+    const duration = Date.now() - startTime;
+    console.log(`[API] All scraping completed in ${duration}ms`);
+    console.log(`[API] Search results summary for '${term}':`);
+    Object.entries(results).forEach(([site, products]) => {
+      console.log(`[API] - ${site.charAt(0).toUpperCase() + site.slice(1)}: ${products.length} products`);
+    });
+
+    // Return existing data if it exists
     if (existing) {
-      console.log(`[API] Skipping save – already exists for '${matchedItem || term}' today`);
+      console.log(`[API] Skipping save – already exists for '${matchedItem || term}' today (ID: ${existing._id})`);
       return res.json({
         query: term,
         item: matchedItem,
-        results: { spani, atacadao, tenda },
+        results,
         saved: false,
         existingId: existing._id,
       });
     }
 
-    // Prepare clean data
-    const cleanSpani = spani.map(({ name, price, quantity, unity }) => ({ name, price, quantity, unity }));
-    const cleanAtacadao = atacadao.map(({ name, price, quantity, unity }) => ({ name, price, quantity, unity }));
-    const cleanTenda = tenda.map(({ name, price, quantity, unity }) => ({ name, price, quantity, unity }));
+    // Prepare clean data for database (remove extra fields)
+    const cleanedData = Object.entries(results).reduce((acc, [site, products]) => {
+      acc[site] = cleanProductData(products);
+      return acc;
+    }, {});
 
-    // Save
+    // Save results to database
     const saved = await SearchResult.create({
       query: term,
       item: matchedItem,
-      spani: cleanSpani,
-      atacadao: cleanAtacadao,
-      tenda: cleanTenda,
+      ...cleanedData
     });
 
-    console.log(`[API] Saved result for '${matchedItem || term}'`);
+    console.log(`[API] Saved result for '${matchedItem || term}' with ID: ${saved._id}`);
 
     res.json({
       query: term,
       item: matchedItem,
-      results: { spani, atacadao, tenda },
+      results,
       saved: true,
       savedId: saved._id,
     });
 
   } catch (err) {
-    console.error(`[API] Failed to fetch/save product data:`, err.message);
-    return res.status(500).json({ error: 'Failed to fetch or save product data' });
+    console.error(`[API] Failed to fetch/save product data:`, err);
+    return res.status(500).json({ 
+      error: 'Failed to fetch or save product data',
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
