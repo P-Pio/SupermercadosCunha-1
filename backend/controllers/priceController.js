@@ -90,30 +90,23 @@ const getDateFromPeriod = (period) => {
 
 exports.getHistoricalPrices = async (req, res) => {
   // Log entry point to make sure the function is being hit
-  console.log("Entered getHistoricalPrices function");
 
   // Log the parameters and query received from the request
-  console.log("Request Params (ID):", req.params);
-  console.log("Request Query (Period):", req.query);
 
   const { id: itemId } = req.params;
   const { period } = req.query; // Only require `period` for date range
 
   // Check if the 'period' parameter is missing
   if (!period) {
-    console.log("Period parameter is missing");
     return res.status(400).json({ message: "Missing period parameter" });
   }
 
   // Log the start and end date being used for the query
   const startDate = getDateFromPeriod(period);
   const endDate = new Date();
-  console.log(`Start Date: ${startDate}, End Date: ${endDate}`);
 
   try {
     // Log the query being sent to the database
-    console.log(`Fetching historical prices for Item ID: ${itemId}`);
-    console.log(`Querying Prices with Date Range: ${startDate} to ${endDate}`);
 
     // Fetch all historical prices matching itemId and date range
     const historicalPrices = await Price.find({
@@ -122,11 +115,9 @@ exports.getHistoricalPrices = async (req, res) => {
     }).sort({ createdAt: 1 }); // Sort by date in ascending order
 
     // Log the result of the database query
-    console.log(`Historical Prices Found: ${historicalPrices.length}`);
 
     // Check if no historical prices were found
     if (historicalPrices.length === 0) {
-      console.log("No historical prices found");
       return res.status(404).json({ message: "No historical prices found" });
     }
 

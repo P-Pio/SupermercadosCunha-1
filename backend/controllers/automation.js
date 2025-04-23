@@ -76,8 +76,6 @@ exports.searchExternalItems = async (req, res) => {
       { name: 'tenda', scraper: fetchTendaProducts }
     ];
 
-    // Execute all scraping tasks in parallel
-    console.log(`[API] Starting parallel scraping for '${term}'`);
     const startTime = Date.now();
     
     const scrapingResults = await Promise.all(
