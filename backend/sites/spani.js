@@ -1,28 +1,50 @@
-const fetch = global.fetch || require('node-fetch'); // Use built-in or polyfill
+/**
+ * Spani product scraper using direct API access with exact browser headers
+ */
+const fetch = global.fetch || require('node-fetch');
 
 /**
  * Fetches product data from Spani Online supermarket
  * @param {string} query - Search term
+ * @param {number} page - Page number (defaults to 1)
  * @returns {Promise<Array>} - Promise resolving to array of product objects
  */
 async function fetchSpaniProducts(query, page = 1) {
   console.log(`[Spani] Searching for: ${query} (page ${page})`);
-  const encodedQuery = encodeURIComponent(query.trim());
   const originalQuery = query.trim().toLowerCase();
-
+  
+  // Create the exact format seen in the network request (+ instead of spaces)
+  const plusEncodedQuery = originalQuery.replace(/\s+/g, '+');
+  
   try {
-    // Use the VipCommerce API endpoint
-    const apiEndpoint = `https://services-beta.vipcommerce.com.br/api-admin/v1/org/67/filial/1/centro_distribuicao/6/loja/buscas/produtos/termo/${encodedQuery}?page=${page}&departamento=0`;
+    // Use the exact API endpoint from the network request
+    const apiEndpoint = `https://services-beta.vipcommerce.com.br/api-admin/v1/org/67/filial/1/centro_distribuicao/6/loja/buscas/produtos/termo/${plusEncodedQuery}?page=${page}&departamento=0`;
     
     console.log(`[Spani] Using API endpoint: ${apiEndpoint}`);
     
+    // Copy exact headers from the browser request
     const apiRes = await fetch(apiEndpoint, {
+      method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+        'accept': 'application/json',
+        'accept-encoding': 'gzip, deflate, br, zstd',
+        'accept-language': 'en-US,en;q=0.9,pt;q=0.8',
+        'authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NDQyNTg1NzQsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiNjcifQ.mAyfOpEf99Ht-2NZ6qbFr6TijHrGH4l8kn7ukAkfBOquYJ1pLKgQ5GBWVXKX7y_zKYH4p5M3-02haPmjWwcBNg',
+        'content-type': 'application/json',
+        'domainkey': 'spanionline.com.br',
+        'organizationid': '67',
+        'origin': 'https://www.spanionline.com.br',
+        'referer': 'https://www.spanionline.com.br/',
+        'sec-ch-ua': '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'cross-site',
+        'sessao-id': '7a1c2992738ee01d7104b982628dee3a',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
       },
-      timeout: 10000 // 10 second timeout
+      timeout: 15000 // 15 second timeout
     });
     
     if (!apiRes.ok) {
@@ -152,6 +174,20 @@ async function fetchSpaniProducts(query, page = 1) {
     console.error(`[Spani] Error fetching products:`, err);
     return [];
   }
+}
+
+// If we need to directly test this script
+if (require.main === module) {
+  // Example usage when run directly
+  (async () => {
+    try {
+      const results = await fetchSpaniProducts('Arroz 5kg');
+      console.log('Results:', JSON.stringify(results, null, 2));
+    } catch (err) {
+      console.error('Error:', err);
+    }
+    process.exit(0);
+  })();
 }
 
 module.exports = fetchSpaniProducts;
