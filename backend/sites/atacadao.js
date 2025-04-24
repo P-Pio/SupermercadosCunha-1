@@ -6,6 +6,8 @@ const fetch = global.fetch || require('node-fetch'); // Use built-in or polyfill
  * @returns {Promise<Array>} - Promise resolving to array of product objects
  */
 async function fetchAtacadaoProducts(query) {
+  console.log(`[Atacadão] Searching for: ${query}`);
+  const originalQuery = query.trim().toLowerCase();
   const encodedQuery = encodeURIComponent(query.trim());
   const url = `https://www.atacadao.com.br/api/catalog_system/pub/products/search/${encodedQuery}`;
 
@@ -56,7 +58,18 @@ async function fetchAtacadaoProducts(query) {
       };
     }).filter(p => p.name && p.price); // Filter out products without name or price
 
-    return products;
+    // Apply the filter to ensure all words from the query are in the product name
+    const filteredProducts = products.filter(item => {
+      const productName = item.name.toLowerCase();
+      const queryWords = originalQuery.split(/\s+/);
+      
+      // Check if all query words are in the product name
+      return queryWords.every(word => productName.includes(word));
+    });
+    
+    console.log(`[Atacadão] Found ${products.length} products, filtered to ${filteredProducts.length} matching all query terms`);
+    
+    return filteredProducts;
   } catch (err) {
     console.error(`[Atacadão] Error fetching products:`, err.message);
     
@@ -158,7 +171,18 @@ async function fetchAtacadaoProducts(query) {
         }
         
         if (products.length > 0) {
-          return products;
+          // Apply the filter to ensure all words from the query are in the product name
+          const filteredProducts = products.filter(item => {
+            const productName = item.name.toLowerCase();
+            const queryWords = originalQuery.split(/\s+/);
+            
+            // Check if all query words are in the product name
+            return queryWords.every(word => productName.includes(word));
+          });
+          
+          console.log(`[Atacadão] Found ${products.length} products from alternative source, filtered to ${filteredProducts.length} matching all query terms`);
+          
+          return filteredProducts;
         }
       }
       
