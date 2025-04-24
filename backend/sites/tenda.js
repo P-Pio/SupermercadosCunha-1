@@ -6,8 +6,7 @@ const cheerio = require('cheerio');
  * @param {string} query - Search term
  * @returns {Promise<Array>} - Promise resolving to array of product objects
  */
-async function fetchTendaProducts(query) {
-  
+async function fetchTendaProducts(query) {  
   // Store the original query words for filtering later
   const queryWords = query.toLowerCase().trim().split(/\s+/).filter(word => word.length > 2);
   
@@ -36,7 +35,6 @@ async function fetchTendaProducts(query) {
         const data = await apiRes.json();
         
         if (Array.isArray(data) && data.length > 0) {
-                   
           const apiProducts = data.map(p => {
             // Extract price from commertialOffer or commercialOffer (handle both spellings)
             let price = null;
@@ -76,7 +74,6 @@ async function fetchTendaProducts(query) {
               source: 'tenda_api'
             };
           }).filter(p => p.name && p.price); // Remove items without name or price
-          
           allProducts = apiProducts;
         }
       }
@@ -102,7 +99,7 @@ async function fetchTendaProducts(query) {
     
     // Create an array to store products from HTML scraping
     const scrapedProducts = [];
-    
+   
     // Log a small sample of the HTML to help with debugging
     const htmlSample = html.substring(0, 300) + '...';
     
@@ -113,7 +110,7 @@ async function fetchTendaProducts(query) {
              text.length > 10 && 
              text.length < 500;
     });
-        
+    
     // Process each element with price information
     priceElements.each(function() {
       const $el = $(this);
@@ -228,7 +225,7 @@ async function fetchTendaProducts(query) {
         });
       }
     });
-
+    
     // If no products found yet, try to search for structured data
     if (scrapedProducts.length === 0) {
       // Look for JSON-LD data in script tags
@@ -298,7 +295,7 @@ async function fetchTendaProducts(query) {
                $(this).text().includes('price') || 
                $(this).text().includes('R$');
       });
-            
+
       // Try to extract structured data
       scriptTags.each((_, script) => {
         const scriptText = $(script).text();
@@ -368,8 +365,7 @@ async function fetchTendaProducts(query) {
           }
         }
       });
-    }
-
+    }    
     // Add scraped products to allProducts array
     allProducts = [...allProducts, ...scrapedProducts];
     
@@ -484,12 +480,13 @@ function filterProductsByQueryWords(products, queryWords) {
  */
 function formatProductsForMongoose(products) {
   return products.map(product => {
-    // Create a new object with the correct property names
+    // Create a new object with the correct property names and include the link
     return {
       name: product.name || '',
       price: product.price || 0,
       quantity: product.quantity || '',
-      unity: product.unit || '' // Map 'unit' to 'unity' as per schema
+      unity: product.unit || '', // Map 'unit' to 'unity' as per schema
+      link: product.link || '' // Include the product link
     };
   });
 }
